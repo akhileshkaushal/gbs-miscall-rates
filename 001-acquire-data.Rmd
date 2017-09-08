@@ -45,7 +45,7 @@ we can turn those into an 012 file:
 ```{sh}
 ulimit -n 3000  # allow vcftools to open temp files
 vcftools --gzvcf raw_data/10156-586.recode.vcf.gz  --012 --out processed_data/lobster
-gzip processed_data/lobster.012
+gzip -f processed_data/lobster.012
 ```
 
 And now we parse the sample names to get the populations and save them in `lobster_pops.csv`.
@@ -78,7 +78,7 @@ we can turn those into an 012 file:
 ```{sh}
 ulimit -n 3000  # allow vcftools to open temp files
 vcftools --gzvcf raw_data/4pop_no_hybrid_mac_1.vcf.gz  --012 --out processed_data/anchovy
-gzip processed_data/anchovy.012
+gzip -f processed_data/anchovy.012
 ```
 
 And now we parse the sample names to get the populations and save them.
@@ -109,7 +109,7 @@ we can turn those into an 012 file:
 ```{sh}
 ulimit -n 3000  # allow vcftools to open temp files
 vcftools --gzvcf raw_data/vcf\ file\ Genome-wide\ SNP\ catalogue\ in\ Lagenorhynchus\ spp.vcf.gz  --012 --out processed_data/dolphin
-gzip processed_data/dolphin.012
+gzip -f processed_data/dolphin.012
 ```
 
 To get the species of each sample I had to go scrape that info out of their Table S1
@@ -162,7 +162,7 @@ Now, make an 012 file from this:
 ```{sh}
 ulimit -n 3000
 vcftools --gzvcf raw_data/chinook-light.recode.vcf.gz  --012 --out processed_data/chinook_gatk
-gzip processed_data/chinook_gatk.012
+gzip -f processed_data/chinook_gatk.012
 ```
 
 ## wifl
@@ -243,7 +243,7 @@ need to be called.
 mv processed_data/chinook_hecht_indv2039_pos19703.012 processed_data/chinook_hecht.012
 mv processed_data/chinook_hecht_indv2039_pos19703.012.indv processed_data/chinook_hecht.012.indv
 mv processed_data/chinook_hecht_indv2039_pos19703.012.pos processed_data/chinook_hecht.012.pos
-gzip processed_data/chinook_hecht.012
+gzip -f  processed_data/chinook_hecht.012
 ```
 
 Now, we get the populations:
@@ -344,6 +344,8 @@ aro_miss$plot
 And now we just have to move those so that the don't have the junk on them.
 ```{sh}
 for i in processed_data/*_indv*; do j=${i/_indv*./.}; mv $i $j; done 
+gzip -f processed_data/anguilla.012
+gzip -f processed_data/rostrata.012
 ```
 
 ## snails
@@ -370,7 +372,7 @@ our miscalling rate estimates at all (as far as I know).
 ```{sh}
 ulimit -n 3000
 vcftools --gzvcf raw_data/all.vcf.gz  --012 --out processed_data/snails
-gzip processed_data/snails.012
+gzip -f processed_data/snails.012
 ```
 
 For the populations, they use the first letter to refer to the ecotype (E = wave) and
@@ -381,6 +383,14 @@ dat <- read_012("processed_data/snails", gz = TRUE)
 tibble(sample = rownames(dat)) %>%
   mutate(pop = str_replace_all(sample, "[^A-Z]", "")) %>% 
   write_csv(., path = "processed_data/snail_pops.csv")
+```
+
+## Wrap-Up
+At the end of that, we put the metadata in a tibble:
+```{r}
+md <- bind_rows(meta_data, .id = "study")
+write_rds(md, path = "processed_data/meta_data.rds")
+md
 ```
 
 
