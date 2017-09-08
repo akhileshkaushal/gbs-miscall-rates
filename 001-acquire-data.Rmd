@@ -1,0 +1,393 @@
+---
+title: "Acquiring Data Sets"
+output: 
+  html_notebook:
+    toc: true
+    toc_float: true
+---
+
+
+Here we document our process for finding a few GBS data sets to explore.
+
+Each section below is given a name that follows our naming convention
+for each data set.  In each section, we tell where the data are available
+and then we run through the steps needed to process the data into an 012 file
+that we use for downstream analysis, and a pops file that tells which populations
+the samples are from.
+
+We will complie information about the studies in a tibble that could be useful
+as we go along.
+
+Before we get going.  Let's load some libraries:
+```{r}
+library(tidyverse)
+library(stringr)
+library(genoscapeRtools)  
+```
+
+## lobster
+
+We will get the data set with all 10156 SNPs.
+
+Define our parameters:
+```{r}
+meta_data <- list()
+meta_data$lobster = tibble(
+  names = "lobster",
+  paperDOI = "10.1111/mec.13245",
+  dataURL = "http://datadryad.org/bitstream/handle/10255/dryad.108679/10156-586.recode.vcf?sequence=1",
+  bibtexKey = "lobster2015" 
+)
+```
+
+I already had those data, so I just copied them to `raw_data` and gzipped them.  Now,
+we can turn those into an 012 file:
+```{sh}
+ulimit -n 3000  # allow vcftools to open temp files
+vcftools --gzvcf raw_data/10156-586.recode.vcf.gz  --012 --out processed_data/lobster
+gzip processed_data/lobster.012
+```
+
+And now we parse the sample names to get the populations and save them in `lobster_pops.csv`.
+```{r}
+d012 <- read_012("processed_data/lobster", gz = TRUE)
+tibble(sample = rownames(d012)) %>%
+  separate(sample, into = c("pop", "num"), remove = FALSE) %>%
+  write_csv(., path = "processed_data/lobster_pops.csv")
+```
+
+Lobster data has now been processed.
+
+## anchovy
+
+These folks had their raw data in a VCF file, so it seeemed a good candidate to use.  Let's use the
+data set that has individuals that do not look like hybrids from
+4 populations (Marine and Lagoon from Mediterranean and Atlantic)
+
+Define our parameters:
+```{r}
+meta_data$anchovy = tibble(
+  names = "anchovy",
+  paperDOI = "10.1111/mec.13627",
+  dataURL = "http://datadryad.org/bitstream/handle/10255/dryad.109437/4pop_no_hybrid_mac_1.vcf?sequence=1",
+  bibtexKey = "anchovy2015")
+```
+
+I dowloaded data to `4pop_no_hybrid_mac_1.vcf` in `raw_data` and gzipped them.  Now,
+we can turn those into an 012 file:
+```{sh}
+ulimit -n 3000  # allow vcftools to open temp files
+vcftools --gzvcf raw_data/4pop_no_hybrid_mac_1.vcf.gz  --012 --out processed_data/anchovy
+gzip processed_data/anchovy.012
+```
+
+And now we parse the sample names to get the populations and save them.
+```{r}
+d012 <- read_012("processed_data/anchovy", gz = TRUE)
+tibble(sample = rownames(d012)) %>%
+  separate(sample, into = c("ocean", "habitat"), sep = "_", remove = FALSE, extra = "drop") %>%
+  mutate(pop = paste0(ocean, "_", habitat)) %>%
+  write_csv(., path = "processed_data/anchovy_pops.csv")
+```
+
+
+## dolphin
+
+We have a study of white-sided and white-beaked dolphins.  It had data in a VCF.
+Define our parameters:
+```{r}
+meta_data$dolphin = tibble(
+  names = "dolphin",
+  paperDOI = "10.1111/1755-0998.12427",
+  dataURL = "http://datadryad.org/bitstream/handle/10255/dryad.86489/vcf%20file%20Genome-wide%20SNP%20catalogue%20in%20Lagenorhynchus%20spp.vcf?sequence=1",
+  bibtexKey = "dolphin2015" 
+)
+```
+
+Downloaded to `raw_data/vcf file Genome-wide SNP catalogue in Lagenorhynchus spp.vcf.gz` and gzipped.  Now,
+we can turn those into an 012 file:
+```{sh}
+ulimit -n 3000  # allow vcftools to open temp files
+vcftools --gzvcf raw_data/vcf\ file\ Genome-wide\ SNP\ catalogue\ in\ Lagenorhynchus\ spp.vcf.gz  --012 --out processed_data/dolphin
+gzip processed_data/dolphin.012
+```
+
+To get the species of each sample I had to go scrape that info out of their Table S1
+which was a Word document.  Seriously people, you should put sample information on Dryad
+too. I am not going to record that process since it is basically not reproducible anyway.
+The pops file is now in:  `processed_data/dolphin_pops.csv`.
+
+
+## wak_chinook
+
+Western Alaska chinook data set.  
+Define our parameters:
+```{r}
+meta_data$wak_chinook = tibble(
+  names = "wak_chinook",
+  paperDOI = "10.1111/eva.12128",
+  dataURL = "http://datadryad.org/bitstream/handle/10255/dryad.55063/genepop_western_alaska_chinook_RAD.txt?sequence=1",
+  bibtexKey = "wak_chinook2014")
+```
+
+This data set is in Genepop format, which is an abominable format for large SNP data sets.
+On top of that, it had a weird special character or an extra column in each row.  Processing
+it was a bit of a hassle, and I don't show that here.   But the 012 file is in `raw_data`.
+
+
+## chinook_gatk
+
+I used some chinook data from the Prince et al paper.  I ran these through 
+our bowtie/GATK pipeline some time ago to recreate, approximately, their association test. My recollection
+is that these were kinda ugly when I plotted out the 
+missing data levels with genoscapeRtools.  Now, I want to have another look at these.
+This will give us a sense for what happens when you put somewhat low-quality, low-coverage
+data into a bowtie/GATK pipeline.  
+
+My SNP calling in the chinook data is chronicled [here](https://github.com/eriqande/genoscape-bioinformatics/blob/master/user-notes/eric-anderson/step-by-step-chinook.md).
+It looks like we have about 56K SNPs in 250 individuals
+after light filtering. I have put the VCF into this repo at:
+`raw_data/chinook-light.recode.vcf.gz`. 
+
+Define our parameters:
+```{r}
+meta_data$chinook_gatk = tibble(
+  names = "chinook_gatk",
+  paperDOI = "10.1126/sciadv.1603198",
+  dataURL = "Get it from the Short Read Archive",
+  bibtexKey = "chinook_gatk2017")
+```
+
+Now, make an 012 file from this:
+```{sh}
+ulimit -n 3000
+vcftools --gzvcf raw_data/chinook-light.recode.vcf.gz  --012 --out processed_data/chinook_gatk
+gzip processed_data/chinook_gatk.012
+```
+
+## wifl
+
+We have some Willow Flycatcher data from Kristen Ruegg's lab.  This is not published
+yet, but it is instructive, so I will put it in my local repository but not push 
+it up to GitHub before it is published.  It is 175 individuals at 105,000 SNPs that
+were only lightly filtered (and not tested for HWE, yet.)
+
+```{r}
+meta_data$wifl = tibble(
+  names = "wifl",
+  paperDOI = NA,
+  dataURL = NA,
+  bibtexKey = NA)
+```
+
+The 012 file is gzipped and it is with the pops file in `processed_data`.
+
+
+
+## chinook_hecht
+
+Let's have a look at Ben Hecht's big chinook data set.  
+```{r}
+meta_data$chinook_hecht = tibble(
+  names = "chinook_hecht",
+  paperDOI = "10.1111/mec.13409",
+  dataURL = "http://datadryad.org/bitstream/handle/10255/dryad.91108/Hecht_OtsLandscapeGenomics_Dryad-Genotypes_061915.xlsx?sequence=1",
+  bibtexKey = "chinook_hecht2015")
+```
+Their genotype data is in an excel file.  I downloaded it, turned it into a CSV and then gzipped it.  Let's process it 
+now:
+```{r}
+dat <- read_csv("raw_data/Hecht_OtsLandscapeGenomics_Dryad-Genotypes_061915.csv.gz", skip = 1, progress = FALSE)
+```
+
+The top line of the file tells us that: "Table S4b Individual genotypes for each sample at each of the 19,703 loci.  Sample ID is population abbreviation (see Table 1) followed by ""xXXX"", where XXX is a three digit numerical identifier.".
+
+So, each column is a sample, each row is a locus.  There is a column for P which looks like "reference allele" and 
+a column, Q, which looks like "alternate allele". Given that, let's code the P as the 0 allele and the Q as the 1 allele.
+We should be able to pretty quickly apply our way through this to get an 012 file out of it.
+```{r}
+dm <- as.matrix(dat)  # make the thing a matrix for faster processing
+
+# here is a function that will return a vector of 0 1 2 NA given a row of the data
+f012NA <- function(x) {
+  genos <- c(
+    str_c(x["P"], x[ "P"]),
+    str_c(x["P"], x["Q"]),
+    str_c(x["Q"], x["P"]),
+    str_c(x["Q"], x["Q"])
+  )
+  g012 <- c(0L, 1L, 1L, 2L)
+  names(g012) <- genos
+  g012[x[-(1:5)]]
+}
+
+# then we apply that over the data
+tmp <- apply(dm, 1, f012NA)
+rownames(tmp) <- colnames(dm)[-(1:5)]
+colnames(tmp) <- dm[, "LOCUS"]
+tmp[is.na(tmp)] <- -1L
+```
+At this junction `tmp` is a matrix like we would get if we read in an 012 file.  So, 
+let's look at missing data levels and write out the file as an 012
+```{r}
+mci <- miss_curves_indv(tmp, clean_pos = 19703, clean_indv = 2039, clean_file_prefix = "processed_data/chinook_hecht")
+```
+Just for fun, let's look at the plot of missing data:
+```{r}
+mci$plot
+```
+
+Nice!  Good work from Hecht at all.  Not much missing data.  Now, let's move the output 012 files to what they
+need to be called.
+```{sh}
+mv processed_data/chinook_hecht_indv2039_pos19703.012 processed_data/chinook_hecht.012
+mv processed_data/chinook_hecht_indv2039_pos19703.012.indv processed_data/chinook_hecht.012.indv
+mv processed_data/chinook_hecht_indv2039_pos19703.012.pos processed_data/chinook_hecht.012.pos
+gzip processed_data/chinook_hecht.012
+```
+
+Now, we get the populations:
+```{r}
+pops <- tibble(sample = rownames(tmp)) %>%
+  mutate(pop = str_replace(sample, "x[0-9][0-9][0-9]$", ""))
+```
+
+
+
+## eels (anguilla and rostrata)
+
+Another paper referenced by the Seeb's response to the Breaking Rad paper.  Let's do it:  
+```{r}
+meta_data$eels = tibble(
+  names = c("anguilla", "rostrata"),
+  paperDOI = "10.1111/mec.13466",
+  dataURL = "http://datadryad.org/bitstream/handle/10255/dryad.102471/Markers%20and%20Important%20markers.tar.gz?sequence=1",
+  bibtexKey = "eels2016")
+```
+
+The files that they have are quasi-genepop, with some tab delimited stuff and one space delimited
+line on top.  It looks like we will be able to read these with read_table2().  I have put the relevant 
+files here:
+```
+./raw_data/Aanguilla_genpop_23659filteredloci.txt.gz
+./raw_data/Arostrata_genpop_14755filteredloci.txt.gz
+```
+So, we need a function to try to read these and convert them to 012.  I do some pre-processing to make tabs of
+the spaces and remove empty lines:
+```{sh}
+gzcat raw_data/Aanguilla_genpop_23659filteredloci.txt.gz | sed 's/ /     /g;' | awk 'NF>10' > /tmp/Aanguilla.txt 
+gzcat raw_data/Arostrata_genpop_14755filteredloci.txt.gz | sed 's/ /     /g;' | awk 'NF>10' > /tmp/Arostrata.txt 
+```
+
+Now, we process things further.  Total hassle.  Some of the SNPs have more than 2 alleles.  I will obviously drop those...
+```{r}
+# a function to return the alleles at a locus
+alles <- function(x) {
+  genos <- names(table(x))
+  a <- sort(unique(c(str_sub(genos, 1, 1),
+         str_sub(genos, 2, 2))))
+}
+
+# we write a function to operate on columns of matrices and return 0 1 or 2.
+# assumes there are exactly two alleles at the locus
+dfunc <- function(x) {
+  a <- alles(x)  # get the alleles
+  genos <- c(0, 1, 1, 2)
+  names(genos) <- c(
+    str_c(a[1], a[1]),
+    str_c(a[1], a[2]),
+    str_c(a[2], a[1]),
+    str_c(a[2], a[2])
+  )
+  unname(genos[x])
+}
+
+# and here is a function that puts those together to get the final 012 matrix.
+# You pass it the path to the files in /tmp
+gp_thing <- function(path) {
+  d <- read_table2(path, progress = FALSE)
+  dm <- as.matrix(d)
+  samples <- dm[, 1]
+  dm <- dm[, -1]
+  
+  # now drop loci with more than 2 alleles
+  drop_em <- apply(dm, 2, function(x) length(alles(x))) != 2
+  dm <- dm[, !drop_em]
+  
+  tmp <- apply(dm, 2, dfunc)
+  tmp[is.na(tmp)] <- -1
+  rownames(tmp) <- samples
+  colnames(tmp) <- colnames(dm)
+  
+  tmp
+}
+```
+
+Now, we can do those files.  Note that these are essentially separate data sets
+so we make separate names for them.
+```{r}
+ang012 <- gp_thing("/tmp/Aanguilla.txt")
+aro012 <- gp_thing("/tmp/Arostrata.txt")
+```
+Let's just look at them for fun and to write them out as 012s
+```{r}
+ang_miss <- miss_curves_indv(ang012, clean_pos = ncol(ang012), clean_indv = ncol(ang012), clean_file_prefix = "processed_data/anguilla")
+ang_miss$plot
+```
+
+Pretty good looking.  Now, let's do the same for aro and then move those files:
+```{r}
+aro_miss <- miss_curves_indv(aro012, clean_pos = ncol(aro012), clean_indv = ncol(aro012), clean_file_prefix = "processed_data/rostrata")
+aro_miss$plot
+```
+
+And now we just have to move those so that the don't have the junk on them.
+```{sh}
+for i in processed_data/*_indv*; do j=${i/_indv*./.}; mv $i $j; done 
+```
+
+## snails
+
+This is another one from the Seeb's table.  They report heterozygote excesses but they attribute them
+to null alleles, because they didn't go away when they twiddled their assembly parameters.
+
+They report that they have done some vigorous filtering for null alleles and they 
+also compute Fst using FREENA which was made for dealing with null alleles in 
+microsatellites.  
+
+They have their data in VCF files, so it should be pretty easy to get this done.
+```{r}
+meta_data$snails = tibble(
+  names = "snails",
+  paperDOI = "10.1111/mec.13332",
+  dataURL = "http://datadryad.org/bitstream/handle/10255/dryad.91991/vcf_files.zip?sequence=1",
+  bibtexKey = "snails2016")
+```
+
+I am going to use the "All" vcf from that data.  That is the one where all the individuals and populations
+are put together.  Some loci will be monomorphic in those cases, but that is fine, that won't change
+our miscalling rate estimates at all (as far as I know).  
+```{sh}
+ulimit -n 3000
+vcftools --gzvcf raw_data/all.vcf.gz  --012 --out processed_data/snails
+gzip processed_data/snails.012
+```
+
+For the populations, they use the first letter to refer to the ecotype (E = wave) and
+the second letter is the location/population.  Since the ecotypes show differences, we 
+will treat each ecotype+location as a different population.
+```{r}
+dat <- read_012("processed_data/snails", gz = TRUE)
+tibble(sample = rownames(dat)) %>%
+  mutate(pop = str_replace_all(sample, "[^A-Z]", "")) %>% 
+  write_csv(., path = "processed_data/snail_pops.csv")
+```
+
+
+```{r, eval=FALSE}
+gfc <- geno_freq_calcs(dat, pops = read_csv("processed_data/snail_pops.csv"))
+ggplot(gfc, aes(x = p_exp, y = p_obs, colour = geno)) + 
+  geom_jitter(alpha = 0.01) + 
+  facet_grid(pop ~ geno) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed")
+```
