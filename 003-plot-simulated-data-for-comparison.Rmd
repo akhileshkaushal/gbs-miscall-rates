@@ -1,0 +1,102 @@
+---
+title: "Plots of simulated data"
+output: 
+  html_notebook:
+  toc: true
+  toc_float: true
+---
+
+
+
+## What should these things look like?
+Let's take 105,000 SNP allele frequencies from the wifl data in the extAZ population, and then sample genotypes
+under H-W from it: one sample of 
+40 diploids and another of 20.
+
+Load up some libraries.
+```{r}
+library(tidyverse)
+library(stringr)
+library(genoscapeRtools)
+```
+
+First, get the data:
+```{r}
+d012 <- read_012("processed_data/wifl", gz = TRUE)
+extAZ <- read_csv("processed_data/wifl_pops.csv") %>%
+  filter(pop == "extAZ")
+d012 <- d012[rownames(d012) %in% extAZ$sample, ]
+
+wifg <- geno_freq_calcs(d012, extAZ)
+```
+Now that we have computed allele freqs we can use them to simulate things genotypes...
+
+```{r}
+# these are allele freqs, each one repeated three times
+p <- wifg %>%
+  filter(pop == "extAZ") %>%
+  .$p
+
+
+p <- p[!near(p, 0.0)]  # drop monomorphic loci, leaving us with 77,787
+
+# take only every third (as they are each repeated three times.)
+p <- p[c(T, F, F)]
+
+# now compute the genotype frequencies. Recall that p is the frequency
+# of the 1 allele, so let's make a matrix of probabilities
+gp <- rbind((1 - p) ^ 2, 
+            2 * p * (1 - p),
+            p ^ 2)
+
+set.seed(123)
+
+# now simulate 40 diploids
+og40 <- apply(gp, 2, function(x) rmultinom(n = 1, size = 40, prob = x))
+
+# and 20 diploids
+og20 <- apply(gp, 2, function(x) rmultinom(n = 1, size = 20, prob = x))
+
+# and put it all into a tibble
+sim_geno <- tibble(
+  pop = rep(c("n = 40", "n = 20"), each = length(og40)),
+  sim_p = rep(rep(p, each = 3), times = 2),
+  snp = rep(rep(1:ncol(og40), each = 3), times = 2),
+  ntot = rep(c(40, 20), each = length(og40)),
+  geno = as.character(rep(c(0, 1, 2), times = 2 * ncol(og40))),
+  sim_p_exp = rep(as.vector(gp), times = 2),
+  n_obs = c(as.vector(og40), as.vector(og20))
+) %>%
+  group_by(pop, snp) %>%
+  mutate(p_obs = n_obs / ntot)
+
+# OK, but now we need to actually get the estimate of p from the 
+# observed genotypes, and from that, compute p_exp.
+sim_geno2 <- sim_geno %>%
+  group_by(pop, snp) %>%
+  mutate( p = (2 *  n_obs[3] + n_obs[2]) / (2 * ntot[1])) %>%
+  mutate(p_exp = c((1 - p[1]) ^ 2, 2 * p[1] * (1 - p[1]), p[1] ^ 2))
+  
+
+```
+
+Finally, let's plot those:
+```{r simmed, fig.width=6, fig.height=3}
+source("R/geno-freq-boundaries.R")
+gfb <- geno_freq_boundaries()
+
+# to make this an easier, smaller thing to plot, let's just sample 10% of the points:
+skinny <- sim_geno2 %>%
+  ungroup() %>%
+  sample_frac(., size = 0.1)
+
+g <- skinny %>%
+  ggplot(., aes(x = p_exp, y = p_obs, colour = geno)) +
+  geom_jitter(alpha = 0.2) +
+  facet_grid(pop ~ geno) +
+  geom_polygon(data = gfb, colour = "black", fill = NA, linetype = "dashed") +
+  geom_abline(slope = 1, intercept = 0, linetype = "solid") +
+  ggtitle("Data simulated in HWE. (n = 20 and n - 40")
+
+ggsave(g, filename = "outputs/simulated-nice-data.pdf", width = 8, height = 6)
+```

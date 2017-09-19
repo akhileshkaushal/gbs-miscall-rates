@@ -1,0 +1,44 @@
+sample,Species,Year,Origin,Location,Sex,Concentration,pop
+FAE_2,L.acutus,2003,Faroe Islands,Hvalvík,Female,70,L.acutus
+FAE_609,L.acutus,2003,Faroe Islands,Hvalvík,Male,60,L.acutus
+FAE_660,L.acutus,2003,Faroe Islands,Hvalvík,Male,25,L.acutus
+FAE_667,L.acutus,2003,Faroe Islands,Hvalvík,Male,30,L.acutus
+FAE_668,L.acutus,2003,Faroe Islands,Hvalvík,Female,50,L.acutus
+FAE_671,L.acutus,2003,Faroe Islands,Hvalvík,Male,35,L.acutus
+FAE_673,L.acutus,2003,Faroe Islands,Hvalvík,Female,25,L.acutus
+FAE_394,L.acutus,2003,Faroe Islands,Tórshavn,Male,20,L.acutus
+FAE_805,L.acutus,2004,Faroe Islands,Klaksvík,Male,20,L.acutus
+FAE_808,L.acutus,2004,Faroe Islands,Klaksvík,Male,30,L.acutus
+FAE_825,L.acutus,2004,Faroe Islands,Klaksvík,Male,30,L.acutus
+FAE_826,L.acutus,2004,Faroe Islands,Klaksvík,Male,30,L.acutus
+FAE_827,L.acutus,2004,Faroe Islands,Klaksvík,Male,45,L.acutus
+FAE_828,L.acutus,2004,Faroe Islands,Klaksvík,Male,20,L.acutus
+FAE_900,L.acutus,2004,Faroe Islands,Klaksvík,Male,45,L.acutus
+FAE_903,L.acutus,2004,Faroe Islands,Klaksvík,Female,25,L.acutus
+FAE_924,L.acutus,2004,Faroe Islands,Klaksvík,Female,35,L.acutus
+FAE_926,L.acutus,2004,Faroe Islands,Klaksvík,Female,30,L.acutus
+FRA_1080,L.acutus,1978,France,Le Conquet,Female,75,L.acutus
+GER_6506,L.acutus,2011,Germany,Spitze,Male,20,L.acutus
+IRE_116,L.acutus,2008,Ireland,Sligo Bay,Male,50,L.acutus
+IRE_11Cork,L.acutus,2002,Ireland,"Mullet Peninsula, Co Mayo",Male,30,L.acutus
+IRE_124,L.acutus,2008,Ireland,Donegal,Female,40,L.acutus
+IRE_1,L.acutus,2007,Ireland,Donegal,Male,25,L.acutus
+IRE_25Cork,L.acutus,1999,Ireland,Donegal,Male,60,L.acutus
+IRE_300,L.acutus,2011,Ireland,Galway,Male,35,L.acutus
+IRE_352,L.acutus,2012,Ireland,Sligo Harbour,Male,40,L.acutus
+IRE_72,L.acutus,2005,Ireland,"Castlegregory, Kerry",Male,55,L.acutus
+IRE_9Cork,L.acutus,2002,Ireland,"Mullet Peninsula, Co Mayo",Male,18 and 25*,L.acutus
+IRE_93,L.acutus,2011,Ireland,Galway,Male,25,L.acutus
+IRE_16Cork,L.acutus,1998,Ireland,"Kilmeena, Co Mayo",Male,75,L.acutus
+IRE_WSD1_00,L.acutus,2000,Ireland,"Doolin, Co Clare",Male,40,L.acutus
+SCO_E_M22207,L.acutus,2007,Scotland,Inverness,Male,80,L.acutus
+SCO_E_M22611,L.acutus,2011,Scotland,"Castlehill, Highlands",Male,19,L.acutus
+SCO_E_M5707,L.acutus,2007,Scotland,Fife,Female,55,L.acutus
+SCO_SHET_M10506,L.acutus,2006,Scotland,"Urafirth , Shetland",Female,40,L.acutus
+SCO_SHET_M15806,L.acutus,2006,Scotland,"Dury  Voe , Shetland",Female,50,L.acutus
+SCO_SHET_M9201,L.acutus,2001,Scotland,"Bressay , Shetland",Male,25,L.acutus
+SCO_W_M10007,L.acutus,2007,Scotland,Strachclyde,Male,60,L.acutus
+SCO_W_M17107,L.acutus,2007,Scotland,"Gillean Bay, Skye",Male,85,L.acutus
+SCO_W_M17507,L.acutus,2007,Scotland,"Stranraer, Dumfries Galloway",Male,85,L.acutus
+SCO_W_M22311,L.acutus,2011,Scotland,North Uist,Male,30,L.acutus
+SCO_W_M24411,L.acutus,2011,Scotland,Stornoway,Male,25,L.acutus

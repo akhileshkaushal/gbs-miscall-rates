@@ -97,7 +97,7 @@ We have a study of white-sided and white-beaked dolphins.  It had data in a VCF.
 Define our parameters:
 ```{r}
 meta_data$dolphin = tibble(
-  names = "dolphin",
+  names = c("dolphin_L_acutus", "dolphin_L_albirostris"),
   paperDOI = "10.1111/1755-0998.12427",
   dataURL = "http://datadryad.org/bitstream/handle/10255/dryad.86489/vcf%20file%20Genome-wide%20SNP%20catalogue%20in%20Lagenorhynchus%20spp.vcf?sequence=1",
   bibtexKey = "dolphin2015" 
@@ -117,7 +117,42 @@ which was a Word document.  Seriously people, you should put sample information 
 too. I am not going to record that process since it is basically not reproducible anyway.
 The pops file is now in:  `processed_data/dolphin_pops.csv`.
 
+Now, I have to break the 012 file into two parts:
+```{r}
+dolphin_pops <- read_csv("processed_data/dolphin_pops.csv")
+dolph012 <- read_012("processed_data/dolphin", gz = TRUE)
+acutus_pops <- dolphin_pops %>%
+  filter(Species == "L.acutus")
+albirostris_pops <- dolphin_pops %>%
+  filter(Species == "L.albirostris")
+acutus012 <- dolph012[rownames(dolph012) %in% acutus_pops$sample, ]
+albirostris012 <- dolph012[rownames(dolph012) %in% albirostris_pops$sample, ]
 
+# now write those things out
+cat(str_replace(colnames(acutus012), "--", "\t"), sep = "\n", 
+    file = "processed_data/dolphin_L_acutus.012.pos")
+cat(rownames(acutus012), sep = "\n", file = "processed_data/dolphin_L_acutus.012.indv")
+rownames(acutus012) <- 0:(nrow(acutus012) - 1)
+write.table(acutus012, row.names = TRUE, quote = FALSE, sep = "\t", 
+            col.names = FALSE, file = "processed_data/dolphin_L_acutus.012")
+write_csv(acutus_pops, path = "processed_data/dolphin_L_acutus_pops.csv")
+
+
+cat(str_replace(colnames(albirostris012), "--", "\t"), sep = "\n", 
+    file = "processed_data/dolphin_L_albirostris.012.pos")
+cat(rownames(albirostris012), sep = "\n", file = "processed_data/dolphin_L_albirostris.012.indv")
+rownames(albirostris012) <- 0:(nrow(albirostris012) - 1)
+write.table(albirostris012, row.names = TRUE, quote = FALSE, sep = "\t", 
+            col.names = FALSE, file = "processed_data/dolphin_L_albirostris.012")
+write_csv(albirostris_pops, path = "processed_data/dolphin_L_albirostris_pops.csv")
+
+```
+
+
+```{sh}
+gzip processed_data/dolphin_L_acutus.012
+gzip processed_data/dolphin_L_albirostris.012
+```
 ## wak_chinook
 
 Western Alaska chinook data set.  
@@ -132,7 +167,9 @@ meta_data$wak_chinook = tibble(
 
 This data set is in Genepop format, which is an abominable format for large SNP data sets.
 On top of that, it had a weird special character or an extra column in each row.  Processing
-it was a bit of a hassle, and I don't show that here.   But the 012 file is in `raw_data`.
+it was a bit of a hassle, and I don't show that here.   I have put everything we 
+need into `processed_data` under the `wak_chinook` name.
+
 
 
 ## chinook_gatk
@@ -165,6 +202,20 @@ vcftools --gzvcf raw_data/chinook-light.recode.vcf.gz  --012 --out processed_dat
 gzip -f processed_data/chinook_gatk.012
 ```
 
+
+And now we need to get a file with the population samples in it.
+```{r}
+chinook_gatk <- read_012("processed_data/chinook_gatk", gz = TRUE)
+
+chinook_meta <- read_tsv("raw_data/DNAID_FileID.list", col_names = c("sample", "poppy"))
+
+cgatk_pops <- tibble(sample = rownames(chinook_gatk)) %>%
+  left_join(chinook_meta, by = "sample") %>%
+  mutate(pop = str_replace(poppy, "_[0-9][0-9]_[A-Z][0-9][0-9]$", "")) %>%
+  select(-poppy)
+
+write_csv(cgatk_pops, path = "processed_data/chinook_gatk_pops.csv")
+```
 ## wifl
 
 We have some Willow Flycatcher data from Kristen Ruegg's lab.  This is not published
@@ -250,8 +301,9 @@ Now, we get the populations:
 ```{r}
 pops <- tibble(sample = rownames(tmp)) %>%
   mutate(pop = str_replace(sample, "x[0-9][0-9][0-9]$", ""))
-```
 
+write_csv(pops, "processed_data/chinook_hecht_pops.csv")
+```
 
 
 ## eels (anguilla and rostrata)
@@ -341,12 +393,37 @@ aro_miss <- miss_curves_indv(aro012, clean_pos = ncol(aro012), clean_indv = ncol
 aro_miss$plot
 ```
 
-And now we just have to move those so that the don't have the junk on them.
+And now we just have to move those so that they don't have the junk on their names.
 ```{sh}
-for i in processed_data/*_indv*; do j=${i/_indv*./.}; mv $i $j; done 
-gzip -f processed_data/anguilla.012
-gzip -f processed_data/rostrata.012
+cd processed_data
+
+mv anguilla_indv21953_pos21953.012 anguilla.012
+mv anguilla_indv21953_pos21953.012.pos anguilla.012.pos
+mv anguilla_indv21953_pos21953.012.indv anguilla.012.indv
+gzip -f anguilla.012
+
+mv rostrata_indv13446_pos13446.012 rostrata.012
+mv rostrata_indv13446_pos13446.012.pos rostrata.012.pos
+mv rostrata_indv13446_pos13446.012.indv rostrata.012.indv
+gzip -f rostrata.012
+
 ```
+
+
+Popfiles:
+```{r}
+ang <- read_012("processed_data/anguilla", gz = TRUE)
+tibble(sample = rownames(ang)) %>%
+  mutate(pop = str_extract(sample, "[A-Z][a-z]")) %>%
+  write_csv("processed_data/anguilla_pops.csv")
+
+ros <- read_012("processed_data/rostrata", gz = TRUE)
+tibble(sample = rownames(ros)) %>%
+  mutate(pop = str_extract(sample, "[A-Z][A-Z]+")) %>%
+  write_csv("processed_data/rostrata_pops.csv")
+```
+
+
 
 ## snails
 
@@ -382,8 +459,114 @@ will treat each ecotype+location as a different population.
 dat <- read_012("processed_data/snails", gz = TRUE)
 tibble(sample = rownames(dat)) %>%
   mutate(pop = str_replace_all(sample, "[^A-Z]", "")) %>% 
-  write_csv(., path = "processed_data/snail_pops.csv")
+  write_csv(., path = "processed_data/snails_pops.csv")
 ```
+
+## damselfly
+
+This is another one mentioned by the Seeb response.  Another RAD method.
+It will be nice to get an insect in there, so let's toss it in there.
+It is a VCF file too.  Here is the meta data, but I don't include it in our 
+list because it is not a workable data set....
+```{r}
+tibble(
+  names = "damselfly",
+  paperDOI = "10.1111/mec.13462",
+  dataURL = "http://datadryad.org/bitstream/handle/10255/dryad.98912/SNP_dataset_Coenagrion_scitulum.vcf?sequence=1",
+  bibtexKey = "damselfly2015")
+```
+
+I downloaded the VCF and gzipped it and put it in raw_data. I tried processing it but there was a 
+failure because they had added two extra `##`'s on one of the FORMAT lines.  I removed those and
+saved the result as `damselfly2.vcf.gz`.  Then turned it into an 012.
+```sh
+ulimit -n 3000
+vcftools --gzvcf raw_data/damselfy2.vcf.gz --012 --out processed_data/damselfly
+gzip -f processed_data/damselfly.012
+```
+
+Let's figure out the pops. I downloaded the phenotypes file to be able to deal with that
+
+The names in the VCF don't match up with all their ID names in the phenotypes file.  
+That is too bad.  This looks like a good data set to look at.  We could merge all the
+"core" populations because they have super low Fst.  But I can't do that if I can't
+associate the IDs in the VCF with what they have in their phenotypes file.
+
+What a nightmare.  I don't think I can use this.
+
+
+
+
+## red_drum
+
+Let's have a look at some ddRAD data out of the ddocent group. The data are not on dryad but they seem to
+be on figshare.  I am curious to see how this compares to RAD-PE.  They sampled lots of different locations
+but the highest Fst between any of the spots was 0.0036, which is tiny.
+```{r}
+meta_data$red_drum = tibble(
+  names = "red_drum",
+  paperDOI = "10.1038/srep36095",
+  dataURL = "https://figshare.com/articles/Final_filtered_SNPs_vcf/3490232",
+  bibtexKey = "reddrum2016")
+```
+
+I downloaded the VCF file and then gzipped it,
+and saved it into `./raw_data/red_drum_Final_Filtered_SNPs.vcf.gz`.   This is their "final filtered"
+data set for analysis.  Now, let's turn it into
+an 012 file:
+```{sh}
+ulimit -n 3000
+vcftools --gzvcf raw_data/red_drum_Final_Filtered_SNPs.vcf.gz --012 --out processed_data/red_drum
+gzip -f processed_data/red_drum.012
+```
+
+Now, we get the rownames and make a pops file.  We put everyone into the
+same population, because the Fst's are so tiny.
+```{r}
+d012 <- read_012("processed_data/red_drum", gz = TRUE)
+tibble(sample = rownames(d012)) %>%
+  mutate(pop = "all_lumped") %>%
+  write_csv(., path = "processed_data/red_drum_pops.csv")
+```
+
+
+
+## bonnethead_sharks
+
+We have another ddRAD data set that we can get from Dryad.
+These sharks show some spatial structure in the PCA so, we will
+limit our investigation to the largest sample (n = 36, it looks like
+from the paper.)  It is interesting to note that the filtered
+these for conformance to HWE.
+
+```{r}
+meta_data$bonnethead_shark = tibble(
+  names = "bonnethead_shark",
+  paperDOI = "10.1111/mec.13441",
+  dataURL = "http://datadryad.org/bitstream/handle/10255/dryad.99440/SNP.FINAL.recode.vcf?sequence=1",
+  bibtexKey = "bonnethead_shark2015")
+```
+
+I downloaded the VCF file and then gzipped it
+and saved it into `./raw_data/bonnethead_shark_SNP.FINAL.recode.vcf.gz`.   This is their "final filtered"
+data set for analysis.  Now, let's turn it into
+an 012 file:
+```{sh}
+ulimit -n 3000
+vcftools --gzvcf raw_data/bonnethead_shark_SNP.FINAL.recode.vcf.gz --012 --out processed_data/bonnethead_shark
+gzip -f processed_data/bonnethead_shark.012
+```
+
+Now, let's make the sample lists.  With any luck the sample names will
+make sense and we can just parse them.  Yes! They are...
+```{r}
+d012 <- read_012("processed_data/bonnethead_shark", gz = TRUE)
+
+tibble(sample = rownames(d012)) %>%
+  separate(sample, into = c("pop", "id"), remove = FALSE) %>%
+  write_csv(path = "processed_data/bonnethead_shark_pops.csv")
+```
+
 
 ## Wrap-Up
 At the end of that, we put the metadata in a tibble:
@@ -391,13 +574,4 @@ At the end of that, we put the metadata in a tibble:
 md <- bind_rows(meta_data, .id = "study")
 write_rds(md, path = "processed_data/meta_data.rds")
 md
-```
-
-
-```{r, eval=FALSE}
-gfc <- geno_freq_calcs(dat, pops = read_csv("processed_data/snail_pops.csv"))
-ggplot(gfc, aes(x = p_exp, y = p_obs, colour = geno)) + 
-  geom_jitter(alpha = 0.01) + 
-  facet_grid(pop ~ geno) +
-  geom_abline(slope = 1, intercept = 0, linetype = "dashed")
 ```

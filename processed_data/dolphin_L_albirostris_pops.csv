@@ -1,0 +1,71 @@
+sample,Species,Year,Origin,Location,Sex,Concentration,pop
+DEN_109,L.albirostris,1999,Denmark,Skagen,Female,100,L.albirostris
+DEN_113,L.albirostris,1999,Denmark,Skallingen,Female,45,L.albirostris
+DEN_128,L.albirostris,1999,Denmark,Vorupør,Male,60,L.albirostris
+DEN_24,L.albirostris,1997,Denmark,Skagen,Female,55,L.albirostris
+DEN_247,L.albirostris,2005,Denmark,"Limfjorden, Bouet",Female,80,L.albirostris
+DEN_265,L.albirostris,2008,Denmark,Fiskeri og søfartsmuseet,Male,90,L.albirostris
+NOR_14502,L.albirostris,2002,Norway,Southern North Sea,Female,17,L.albirostris
+FRA_9912071,L.albirostris,1999,France,Sainte Marie du Mont,Female,35,L.albirostris
+GER_1160,L.albirostris,1998,Germany,Nieblum,Female,40,L.albirostris
+GER_16411,L.albirostris,1990,Germany,NA,Female,19 and 25*,L.albirostris
+GER_17551,L.albirostris,1992,Germany,Tammwerft,Female,50,L.albirostris
+GER_17889,L.albirostris,1993,Germany,Büsum,Female,80,L.albirostris
+GER_17928,L.albirostris,1993,Germany,St Peter Ording,Female,20,L.albirostris
+GER_18088,L.albirostris,1993,Germany,Hevestroom,Female,40,L.albirostris
+GER_18089,L.albirostris,1993,Germany,Eiderstedt,Female,45,L.albirostris
+GER_2425,L.albirostris,2003,Germany,Sylt,Female,105,L.albirostris
+GER_3614,L.albirostris,2006,Germany,Amrum,Female,18,L.albirostris
+GER_3616,L.albirostris,2007,Germany,Sylt,Male,18,L.albirostris
+GER_5600,L.albirostris,2010,Germany,Sylt,Female,135,L.albirostris
+ICE_B19,L.albirostris,1994,Iceland,SW Iceland,Female,35,L.albirostris
+ICE_H1,L.albirostris,1996,Iceland,SE Iceland,Male,85,L.albirostris
+ICE_SS36,L.albirostris,1992,Iceland,SW Iceland,Male,45,L.albirostris
+ICE_SV1_96_female,L.albirostris,1996,Iceland,S Iceland,Female,50,L.albirostris
+ICE_SV17,L.albirostris,1995,Iceland,SW Iceland,Male,80,L.albirostris
+ICE_SV19,L.albirostris,1991,Iceland,SW Iceland,Female,75,L.albirostris
+ICE_SV198,L.albirostris,1992,Iceland,SW Iceland,Male,45,L.albirostris
+ICE_SV199,L.albirostris,1992,Iceland,SW Iceland,Female,195,L.albirostris
+ICE_SV2,L.albirostris,1996,Iceland,SW Iceland,Female,30,L.albirostris
+ICE_SV200,L.albirostris,1992,Iceland,SW Iceland,Female,95,L.albirostris
+ICE_SV201,L.albirostris,1992,Iceland,SW Iceland,Male,35,L.albirostris
+ICE_SV4_female,L.albirostris,1993,Iceland,SW Iceland,Female,265,L.albirostris
+ICE_SV4_male,L.albirostris,1996,Iceland,SW Iceland,Male,70,L.albirostris
+ICE_SV51,L.albirostris,1996,Iceland,SW Iceland,Male,19*,L.albirostris
+ICE_SV5A,L.albirostris,1996,Iceland,SW Iceland,Female,30,L.albirostris
+ICE_SV7,L.albirostris,1993,Iceland,SW Iceland,Male,35,L.albirostris
+ICE_SV86,L.albirostris,1992,Iceland,SW Iceland,Male,65,L.albirostris
+ICE_SV90,L.albirostris,1992,Iceland,SW Iceland,Female,45,L.albirostris
+IRE_117,L.albirostris,2007,Ireland,"Dundoran, Donegan",Female,25,L.albirostris
+IRE_278,L.albirostris,2011,Ireland,Sligo Bay,Female,120,L.albirostris
+IRE_75,L.albirostris,2006,Ireland,Brandon Bay,Male,40,L.albirostris
+IRE_90,L.albirostris,2007,Ireland,"Dundoran, Donegan",Female,20,L.albirostris
+IRE_WBD1_96,L.albirostris,1996,Ireland,Elly Bay,Male,19,L.albirostris
+IRE_WBD2_93,L.albirostris,1993,Ireland,"Camp Dingle, Co. Kerry",Female,20,L.albirostris
+NOR_034500,L.albirostris,2000,Norway,Barents Sea,Male,25,L.albirostris
+NOR_124599,L.albirostris,1999,Norway,Greenland Sea,Female,19,L.albirostris
+NOR_134500,L.albirostris,2000,Norway,Barents Sea,Male,20,L.albirostris
+NOR_34503,L.albirostris,2003,Norway,Norwegian Sea,Male,90,L.albirostris
+NOR_44500,L.albirostris,2000,Norway,Barents Sea,Female,20,L.albirostris
+NOR_54500,L.albirostris,2000,Norway,Barents Sea,Male,25,L.albirostris
+SCO_E_M03104,L.albirostris,2004,Scotland,Fraserburgh,Male,85,L.albirostris
+SCO_E_M11410,L.albirostris,2010,Scotland,Gullane Bay,Female,170,L.albirostris
+SCO_E_M12305,L.albirostris,2005,Scotland,Fife,Female,120,L.albirostris
+SCO_E_M13808,L.albirostris,2008,Scotland,Arbroath,Male,75,L.albirostris
+SCO_E_M1403,L.albirostris,2003,Scotland,Gosford Sands,Female,50,L.albirostris
+SCO_E_M15604,L.albirostris,2004,Scotland,Thurso,Male,265,L.albirostris
+SCO_E_M16709,L.albirostris,2009,Scotland,Fife,Female,40,L.albirostris
+SCO_E_M16801,L.albirostris,2001,Scotland,Banff,Male,18,L.albirostris
+SCO_E_M17001,L.albirostris,2001,Scotland,Scrabster,Male,40,L.albirostris
+SCO_E_M18305,L.albirostris,2005,Scotland,Thurso,Male,50,L.albirostris
+SCO_E_M19209,L.albirostris,2009,Scotland,Dornoch,Female,60,L.albirostris
+SCO_E_M28603,L.albirostris,2003,Scotland,Aberdeen,Male,115,L.albirostris
+SCO_E_M3503,L.albirostris,2003,Scotland,Longniddry,Female,30,L.albirostris
+SCO_E_M9802,L.albirostris,2002,Scotland,Edinburgh,Male,20,L.albirostris
+SCO_N_M19805,L.albirostris,2005,Scotland,Farr Bay,Male,140,L.albirostris
+SCO_ORK_M14101,L.albirostris,2001,Scotland,Brought of Borsay,Female,90,L.albirostris
+SCO_ORK_M22511,L.albirostris,2011,Scotland,Bay of Skail,Male,16,L.albirostris
+SCO_ORK_M286297,L.albirostris,1997,Scotland,Scara Brae,Male,25,L.albirostris
+SCO_SHET_M1010,L.albirostris,2010,Scotland,Boddam,Male,70,L.albirostris
+SCO_W_M25406,L.albirostris,2006,Scotland,Stornoway,Female,115,L.albirostris
+SCO_W_M4608,L.albirostris,2008,Scotland,Kinlochverbie,Female,25,L.albirostris

@@ -2,6 +2,7 @@
 .Rhistory
 .RData
 .Ruserdata
-
 processed_data/wifl*
-
+001-acquire-data.nb.html
+002-plot-geno-freqs.nb.html
+.DS_Store

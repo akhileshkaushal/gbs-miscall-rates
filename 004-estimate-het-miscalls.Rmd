@@ -1,0 +1,110 @@
+---
+title: "Computing Heterozygote Miscall Rates"
+output: 
+  html_notebook:
+    toc: true
+    toc_float: true
+---
+
+
+Load up some libraries.
+```{r}
+library(tidyverse)
+library(stringr)
+library(genoscapeRtools)
+```
+
+We are going to load up a little function that we will use to estimate the 
+rate at which heterozygotes are mistyped as homozygotes from our simple 
+model.  The development of this model occurs in a different notebook.
+
+First, we source up the necessary functions:
+```{r}
+source("R/estimate-m-etc.R")
+```
+
+Now, we make a function that will take the name of the study and the name of the population
+and then will grab the data, filter it down the popuplation we want, and then feed
+it into `esimate_m()` and return the results.  We will also do some filtering to toss out
+individuals with more than 70% missing data and 
+loci with more than 70% missing data, and also to toss monomorphic loci...
+
+```{r}
+#' @param name the name of the data set
+#' @param big_pop the string that gives the name of the population
+#' @example estimate_het_miscall(name = "red_drum", big_pop = "all_lumped")
+estimate_het_miscall <- function(name, big_pop, nreps = 1000) {
+  d012 <- read_012(paste0("processed_data/", name), gz = TRUE)
+  inds <- read_csv(paste0("processed_data/", name, "_pops.csv")) %>%
+    filter(pop == big_pop) %>%
+    .$sample
+  
+  d012 <- d012[inds, ]  # grab just the big population out of there
+  
+  # get ready to deal with missing data
+  miss <- d012 == -1
+  # drop individuals with more than 90% missing data (gotta do this for the dolphin data sets)
+  d012 <- d012[rowMeans(miss) < 0.9, ]
+  miss <- d012 == -1  # recompute data missing in the remaining individuals
+  # drop loci with more than 70% missing data.  This will also get rid of those with all missing data.
+  d012 <- d012[ , colMeans(miss) < 0.7 ]
+  
+  # now drop the monomorhic loci. These are loci that are all 0 or all 2
+  tmp <- d012
+  tmp[d012 == -1] <- NA
+  fixies <- apply(tmp, 2, function(x) all(x == 0, na.rm = TRUE) | all(x == 2, na.rm = TRUE))
+  
+  d012 <- d012[, !fixies]
+  
+  ret <- list() # get ready to return stuff
+  
+  ret$filtered012 <- d012  # this will give us the num of individuals and loci.
+  
+  mest <- estimate_m(d012, nreps = nreps, m_init = 0.1)  # just initialize it at 0.1.  This thing mixes well.
+  
+  ret$m_tibble <- tibble(pop = big_pop, iter = 1:nreps, m = mest$m)
+  ret$overall <- tibble(pop = big_pop, overall_error_rate = mest$overall_geno_err_est)
+  ret$simmed_genos <- mest$simmed_genos
+  
+  ret
+}
+```
+
+Then we load up the meta-data that tells us which populations we will be using, etc, and we make a list of them
+to make it easy to lapply over them
+```{r}
+meta <- read_rds("processed_data/meta_with_big_pops.rds")
+
+big_pop_list <- meta$big_pop
+names(big_pop_list) <- meta$names
+```
+
+And then give this thing a whirl
+```{r}
+set.seed(100)
+big_est_list <- lapply(names(big_pop_list), function(n) {
+  message(n)
+  estimate_het_miscall(name = n, big_pop = big_pop_list[n])
+})
+names(big_est_list) <- names(big_pop_list)
+```
+
+And now we can tidy those up a bit and plot things:
+```{r}
+trace_tib <- lapply(big_est_list, function(x) x$m_tibble) %>%
+  bind_rows(.id = "name")
+
+ggplot(trace_tib, aes(x = iter, y = m)) + 
+  geom_line() +
+  facet_wrap(~ name)
+```
+
+So, that shows us that we are  in good shape if we call 1 to 500 the burn-in
+```{r, rows.print = 20}
+trace_tib %>%
+  filter(iter > 500) %>%
+  group_by(name, pop) %>%
+  summarise(posterior_mean = mean(m)) %>%
+  arrange(posterior_mean)
+    
+```

@@ -1,0 +1,66 @@
+---
+title: "Checking the Model with Simulation"
+output: 
+  html_notebook:
+    toc: true
+    toc_float: true
+---
+
+
+Load up some libraries.
+```{r}
+library(tidyverse)
+library(stringr)
+library(genoscapeRtools)
+```
+
+Just going to run a few simulations (especially with some missing data)
+to make sure that the model is not doing something pathological.  
+
+## Test it on simulated data with no genotyping error
+
+Let's quickly simulate 10K SNPs and then simulate 40 individuals 
+with no genotyping error.
+
+First, here is how we will get the allele freqs:
+```{r}
+p <- rbeta(n = 10000, shape1 = 0.3, shape2 = 0.3)
+p <- p[ !(p < 0.02 | p > 0.98) ]  # drop the MAF < 0.02 SNPs
+hist(p)
+length(p)
+```
+
+Then we can simulate the genotypes
+```{r}
+source("R/estimate-m-etc.R")
+gp <- rbind(p^2, 2 * p * (1 - p), (1 - p) ^ 2)   # genotype freqs
+sim012_no_err <- apply(gp, 2, function(x) sample(x = c(2, 1, 0), size = 40, replace = TRUE, prob = x))
+
+# now see what we get with this data set
+m_est <- estimate_m(sim012_no_err, m_init = 0.1, nreps = 1000)
+mean(m_est$m[-(1:500)])
+```
+
+So, with that simulated data set, the posterior mean estimate is about 1 or 2 out of 1000
+heterozygotes being mistakenly called homozygotes.  That seems good---it is quite low.
+Given that it is constrained to be positive,
+it is not going to be unbiased.
+
+So, let's confirm that we get the correct results even when we have 
+a lot of missing data:
+```{r}
+miss_levs <- seq(0, 0.8, by = 0.1)
+names(miss_levs) <- miss_levs
+
+lapply(miss_levs, function(x){
+  tmp <- sim012_no_err
+  missy <- runif(n = length(tmp)) < x
+  tmp[missy] <- -1
+  m_est <- estimate_m(tmp, m_init = 0.1, nreps = 2000)
+  tibble(posterior_mean = mean(m_est$m[-(1:1000)]))
+}) %>%
+  bind_rows(.id = "missing_data_rate")
+```
+Booyah!  The patterns we are seeing are not the result of a bug in my mode not dealing 
+well with missing data.
+

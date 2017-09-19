@@ -1,0 +1,95 @@
+---
+title: "Plotting Exp and Obs Geno Freqs"
+output: 
+  html_notebook:
+  toc: true
+  toc_float: true
+---
+
+
+
+We are going to go through the different data sets here and just make
+fairly standardized figures of what the expected and observed genotype
+frequencies look like.
+
+Load up some libraries.
+```{r}
+library(tidyverse)
+library(stringr)
+library(genoscapeRtools)
+```
+
+Get the meta data:
+```{r}
+meta_data <- read_rds("processed_data/meta_data.rds")
+```
+
+## A function to grab the data and make the plots
+
+This will be a straightforward thing where we give it the "name" of the data set
+and it reads it in and then does the calcs and saves the plot as a pdf in the 
+outputs directory (if pdf == TRUE).  It will scale the height
+appropriately if there are a lot of populations.
+
+```{r}
+# first source a function that makes it easy to compute the boundaries
+# of the geno freqs
+source("R/geno-freq-boundaries.R")
+plot_geno_freqs <- function(name, alpha = 0.2, plot_all_pops = FALSE) {
+  message("starting ", name)
+  d012 <- genoscapeRtools::read_012(prefix = file.path("processed_data", name), gz = TRUE)
+  pops <- readr::read_csv(paste0("processed_data/", name, "_pops.csv"))
+  
+  # this grabs the biggest sample group
+  big_pop <- pops %>%
+    count(pop) %>%
+    top_n(n = 1, wt = n) %>%
+    .$pop %>%
+    .[1]
+  
+  # this gets the sample names in that biggest pop
+  bp_pops <- pops %>%
+    filter(pop == big_pop) 
+  
+  bp_names <- bp_pops %>%
+    .$sample
+  
+  # this just takes data from the biggest pop samples
+  bp012 <- d012[bp_names,]
+  
+  gfc <- genoscapeRtools::geno_freq_calcs(bp012, bp_pops) %>%
+    filter(!is.nan(z_score))  # this chucks out monomorphic loci
+  
+  
+  gbp <- ggplot(gfc , aes(x = p_exp, y = p_obs, colour = geno)) +
+    geom_jitter(alpha = alpha, position = position_jitter(width = 0.01, height = 0.01)) +
+    facet_grid(pop ~ geno) +
+    geom_polygon(data = geno_freq_boundaries(), fill = NA, linetype = "dashed", colour = "black") + 
+    geom_abline(slope = 1, intercept = 0, linetype = "solid") +
+    ggtitle(paste0(name, " (", bp_pops$pop[1],"), ",  "n = ", nrow(bp_pops)))
+  
+  if (!file.exists("outputs")) dir.create("outputs")
+  ggsave(gbp, filename = paste0("outputs/", name, "_big_pop.pdf"), width = 8, height = 3)
+  
+  big_pop  # return the name of the population with the largest sample
+}
+```
+
+## Running it over everyone
+
+This can be done easily
+```{r}
+big_pops <- lapply(1:nrow(meta_data), function(i) plot_geno_freqs(meta_data$names[i]))
+```
+
+And once we have done that, we can record which populations were the "big pops" (the largest samples)
+for all the different groups:
+```{r}
+meta_with_big_pops <- meta_data %>%
+  mutate(big_pop = unlist(big_pops)) %>%
+  select(study, names, big_pop, everything())
+
+write_rds(meta_with_big_pops, path = "processed_data/meta_with_big_pops.rds")
+```
+
+Now we just have to estimate the genotyping error rates from each of these....
