@@ -6,3 +6,7 @@ processed_data/wifl*
 001-acquire-data.nb.html
 002-plot-geno-freqs.nb.html
 .DS_Store
+003-plot-simulated-data-for-comparison.nb.html
+004-estimate-het-miscalls.nb.html
+005-check-model-with-simulations.nb.html
+outputs
