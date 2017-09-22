@@ -87,6 +87,9 @@ big_est_list <- lapply(names(big_pop_list), function(n) {
   estimate_het_miscall(name = n, big_pop = big_pop_list[n])
 })
 names(big_est_list) <- names(big_pop_list)
+
+# at the end, save it:
+write_rds(big_est_list, "outputs/big_est_list.rds", compress = "xz")
 ```
 
 And now we can tidy those up a bit and plot things:
@@ -101,10 +104,31 @@ ggplot(trace_tib, aes(x = iter, y = m)) +
 
 So, that shows us that we are  in good shape if we call 1 to 500 the burn-in
 ```{r, rows.print = 20}
-trace_tib %>%
+m_post_means <- trace_tib %>%
   filter(iter > 500) %>%
   group_by(name, pop) %>%
   summarise(posterior_mean = mean(m)) %>%
   arrange(posterior_mean)
-    
+
+m_post_means
+```
+
+And at the end, let's save that too!
+```{r}
+write_rds(trace_tib, "outputs/traces_from_mcmc.rds", compress = "xz")
+```
+
+And while we are at it, let's write a file of lines 
+that will insert png versions of the figures along with estimates
+of $m$ into my Rnotebook for the ConGen meeting.
+
+```{r}
+outf <- "outputs/notebook-lines.txt"
+tmp <- m_post_means %>%
+  mutate(lines = paste0("\n\n#### ", name, 
+                        ",  $m = ", 
+                        sprintf("%.2f", posterior_mean),
+                        "$\n\n![](figures/", name, "_big_pop.png)\n\n" ))
+
+cat(tmp$lines, file = outf, sep = "\n")
 ```

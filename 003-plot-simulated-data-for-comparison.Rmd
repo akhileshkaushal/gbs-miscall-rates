@@ -96,7 +96,7 @@ g <- skinny %>%
   facet_grid(pop ~ geno) +
   geom_polygon(data = gfb, colour = "black", fill = NA, linetype = "dashed") +
   geom_abline(slope = 1, intercept = 0, linetype = "solid") +
-  ggtitle("Data simulated in HWE. (n = 20 and n - 40")
+  ggtitle("Data simulated in HWE. (n = 20 and n = 40)")
 
-ggsave(g, filename = "outputs/simulated-nice-data.pdf", width = 8, height = 6)
+ggsave(g, filename = "outputs/simulated-nice-data.pdf", width = 12, height = 8)
 ```

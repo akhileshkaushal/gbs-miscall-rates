@@ -57,19 +57,48 @@ plot_geno_freqs <- function(name, alpha = 0.2, plot_all_pops = FALSE) {
   # this just takes data from the biggest pop samples
   bp012 <- d012[bp_names,]
   
+  #### now I am going to want to drop monomorphic loci so I have a good ###
+  # estimate of how many are left.  And we toss out individuals and loci with 
+  # lots of missing data
+  # get ready to deal with missing data
+  miss <- bp012 == -1
+  # drop individuals with more than 90% missing data (gotta do this for the dolphin data sets)
+  bp012 <- bp012[rowMeans(miss) < 0.9, ]
+  miss <- bp012 == -1  # recompute data missing in the remaining individuals
+  # drop loci with more than 70% missing data.  This will also get rid of those with all missing data.
+  bp012 <- bp012[ , colMeans(miss) < 0.7 ]
+  
+  # now drop the monomorhic loci. These are loci that are all 0 or all 2
+  tmp <- bp012
+  tmp[bp012 == -1] <- NA
+  fixies <- apply(tmp, 2, function(x) all(x == 0, na.rm = TRUE) | all(x == 2, na.rm = TRUE))
+  
+  bp012 <- bp012[, !fixies]
+  
+  # now, make sure the bp_pops only inludes the individuals
+  # that are left.
+  bp_pops <- bp_pops %>%
+    filter(sample %in% rownames(bp012))
+  
   gfc <- genoscapeRtools::geno_freq_calcs(bp012, bp_pops) %>%
     filter(!is.nan(z_score))  # this chucks out monomorphic loci
   
   
+  # now, to plot it, let's scale the alpha so that it is lighter for 
+  # data sets with more loci:
+  alpha_scaled <- max(0.025, alpha * 6000 / ncol(bp012))
+  
   gbp <- ggplot(gfc , aes(x = p_exp, y = p_obs, colour = geno)) +
-    geom_jitter(alpha = alpha, position = position_jitter(width = 0.01, height = 0.01)) +
+    geom_jitter(alpha = alpha_scaled, position = position_jitter(width = 0.01, height = 0.01)) +
     facet_grid(pop ~ geno) +
     geom_polygon(data = geno_freq_boundaries(), fill = NA, linetype = "dashed", colour = "black") + 
     geom_abline(slope = 1, intercept = 0, linetype = "solid") +
-    ggtitle(paste0(name, " (", bp_pops$pop[1],"), ",  "n = ", nrow(bp_pops)))
+    ggtitle(paste0(name, " (", bp_pops$pop[1],"), ",  "n = ", nrow(bp_pops), 
+                   ";  n_f = ", nrow(bp012), ";  L = ", ncol(d012),
+                   ";  L_f = ", ncol(bp012)))
   
   if (!file.exists("outputs")) dir.create("outputs")
-  ggsave(gbp, filename = paste0("outputs/", name, "_big_pop.pdf"), width = 8, height = 3)
+  ggsave(gbp, filename = paste0("outputs/", name, "_big_pop.pdf"), width = 12, height = 5)
   
   big_pop  # return the name of the population with the largest sample
 }
