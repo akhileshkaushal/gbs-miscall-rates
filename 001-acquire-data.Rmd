@@ -165,11 +165,34 @@ meta_data$wak_chinook = tibble(
   bibtexKey = "wak_chinook2014")
 ```
 
-This data set is in Genepop format, which is an abominable format for large SNP data sets.
-On top of that, it had a weird special character or an extra column in each row.  Processing
-it was a bit of a hassle, and I don't show that here.   I have put everything we 
+This data set was in Genepop format.  This is not, in my opinion, a great format for large SNP data sets.
+On top of that, it had a weird special character or an extra column in each row. (This may have been CR/LF line
+endings.  For some reason R wasn't dealing with those elegantly).  Processing that
+was a bit of a hassle, and I don't show that here.   I have put everything we 
 need into `processed_data` under the `wak_chinook` name.
 
+It turns out, for future reference, that Thierry Gosselin has put together a tremendously useful
+package called `radiator` that has functions for reading genepop files (and many other formats)
+and converting to other formats. It is available at [https://github.com/thierrygosselin/radiator](https://github.com/thierrygosselin/radiator).
+Accordingly, I have saved the original genepop file that I downloaded from Dryad, with a few modifications:
+
+1. I changed all the line endings to Unix line endings.
+2. I gave it the extension `.gen`.
+
+That file is now in: `./raw_data/genepop_western_alaska_chinook_RAD.gen`.
+
+It can be read in using radiator like this:
+```{r, eval=FALSE}
+system("gunzip raw_data/genepop_western_alaska_chinook_RAD.gen.gz")
+chinook_radiator <- radiator::genomic_converter(data = "./raw_data/genepop_western_alaska_chinook_RAD.gen", output = "vcf")
+
+# count up the number of genotypes of different types
+count(chinook_radiator$tidy.data, GT_BIN)
+
+```
+
+When these numbers are compared to the data from the 012 file I processed and put in the
+`processed` directory, we see the results are the same up to the naming of alleles. Cool.
 
 
 ## chinook_gatk

@@ -10,3 +10,4 @@ processed_data/wifl*
 004-estimate-het-miscalls.nb.html
 005-check-model-with-simulations.nb.html
 outputs
+radiator_data_*
