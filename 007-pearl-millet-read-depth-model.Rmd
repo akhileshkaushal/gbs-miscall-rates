@@ -1,0 +1,230 @@
+---
+title: "Develop the Read Depth Model"
+output: 
+  html_notebook:
+    toc: true
+    toc_float: true
+---
+
+
+I am working up a model that will use read depth information as well, and I need
+a good data set for developing it.
+
+We need to have read depth data so it will have to be a VCF file.  Of the data
+sets I have locally in this project, it looks like lobster and snails might be the 
+best to try.
+
+## Reading in and looking at the Lobster Data
+
+Let's go for lobster, and we are going to want to extract the population BUZ from that.
+```{r}
+library(tidyverse)
+library(vcfR)
+library(broom)
+
+
+
+v <- read.vcfR("raw_data/PearlMillet_SNPs_filtered.vcf.gz")
+
+# Extract just M1 from there
+v@gt <- v@gt[, str_detect(colnames(v@gt), "^MIL_1")]
+
+
+# now we can make matrices of the 012 genotypes and read depths. We will work directly
+# with the matrices here
+
+# first get 012 matrix
+gt_slash <- matrix(str_match(v@gt, "^([.01]/[.01]):")[,2], nrow = nrow(v@gt))
+repl <- c(
+  `./.` = -1L,
+  `0/0` = 0L,
+  `0/1` = 1L,
+  `1/1` = 2L
+)
+Y <- matrix(repl[gt_slash], nrow = nrow(v@gt))
+
+# then a matrix of read depths
+rd <- matrix(as.integer(str_split_fixed(v@gt, pattern = ":", n = 5)[,3]), nrow = nrow(v@gt))
+
+```
+
+
+## Do the geno freq calcs and plot
+
+```{r}
+rownames(Y) <- paste0(v@fix[,1], "---", v@fix[,2])
+colnames(Y) <- colnames(v@gt)
+Y <- t(Y)
+gfc <- genoscapeRtools::geno_freq_calcs(Y)
+
+ggplot(gfc, aes(x = p_exp, y = p_obs, colour = geno)) + 
+  geom_point(alpha = 0.2) +
+  facet_wrap(~geno)
+```
+
+I think what is going on here is that the sample size is just quite small so the variability
+runs the gamut.
+
+
+
+## Read depth categories
+
+
+I would like to break this up so that there are at least 2500 in each bin.  We can go sequentially by read
+depth up to about 147, and then we will have to start merging things.  We can just make a silly function that goes through
+the above table and lumps things till we have at least 2500 in each cell.
+```{r}
+lump_to_list <- function(x) {
+  j <- 0
+  ret <- list()
+  d <- as.integer(names(x))
+  cumul <- 0
+  thing <- NULL
+  for(i in seq_along(x)) {
+    cumul <- cumul + x[i]
+    thing <- c(thing, d[i])
+    if(cumul >= 500) {
+      j <- j + 1
+      ret[[j]] <- thing
+      cumul <- 0
+      thing <- NULL
+    }
+  }
+  
+  # spit out the remaning ones if they aren't already there
+  if(cumul > 0) {
+    j <- j + 1
+    ret[[j]] <- thing
+  }
+  ret
+}
+
+# then do it
+lumpy_list <- lump_to_list(table(rd[Y != -1]))
+```
+
+Once we have that list we can use it to make a vector that will extract the read depth category from the 
+read depths.
+```{r}
+categs <- unlist(lapply(1:length(lumpy_list), function(i) rep(i, length(lumpy_list[[i]]))))
+names(categs) <- unlist(lumpy_list)
+categs <- unname(categs)  # revert back, they are all contiguous...
+
+R <- t(matrix(categs[rd], nrow = nrow(rd)))
+R[is.na(R)] <- -1
+
+```
+
+
+
+## Run the model...
+
+```{r}
+Rcpp::sourceCpp('src/estimate_m_rd.cpp')
+num_cats <- length(unique(R[R>0]))
+
+# run for 1000 sweeps and start from very low genotyping error
+b <- estimate_m_rd(Y, R, 0.01, num_cats, c(0.5, 0.5), c(0.5, 0.5), 1000)
+
+categ_centers <- tibble(mean_rd = sapply(lumpy_list, mean)) %>%
+  mutate(dp_cat = 1:n())
+
+mean_ms <- rowMeans(b$Mtrace[,-(1:50)])
+low_ms <- apply(b$Mtrace[,-(1:50)], 1, min)
+hi_ms <- apply(b$Mtrace[,-(1:50)], 1, max)
+
+plot(categ_centers$mean_rd, mean_ms)
+lines(categ_centers$mean_rd, low_ms, col = "red")
+lines(categ_centers$mean_rd, hi_ms, col = "blue")
+```
+
+The blue line is the highest value sampled from the posterior and the red line is
+the lowest value.
+
+OK, that is different than we saw before.  It drops down to zero nicely, but then why 
+the heck does it bounce up again?
+
+## Doing some simulations
+
+I clearly need to do some simulations here!  Tell you what, I am going to make a function to 
+which you can pass a Y and an R matrix, and then it will simulate true genotypes in HWE
+and then it will bop out the ones that are missing and also simulate het miscalls according to
+a het-miscall rate.
+
+Put it into `R/simulate-het-miscall-rd.R`
+```{r}
+source("R/simulate-het-miscall-rd.R")
+
+simNone <- simulate_het_miscall_rd(Y, R, M = 0.0)
+b <- estimate_m_rd(simNone$Y_with_err, simNone$R, 0.01, num_cats, c(0.5, 0.5), c(0.5, 0.5), 200)
+
+mean_ms <- rowMeans(b$Mtrace[,-(1:50)])
+low_ms <- apply(b$Mtrace[,-(1:50)], 1, min)
+hi_ms <- apply(b$Mtrace[,-(1:50)], 1, max)
+
+plot(categ_centers$mean_rd, mean_ms)
+lines(categ_centers$mean_rd, low_ms, col = "red")
+lines(categ_centers$mean_rd, hi_ms, col = "blue")
+
+
+```
+
+OK, clearly there is a lot of error here when we don't have a lot of genotypes in each category.
+
+Let's see what happens if we have a high error rate at low read depths...
+```{r}
+simGeom <- simulate_het_miscall_rd(Y, R, M = 1 / 1:num_cats)
+b <- estimate_m_rd(simGeom$Y_with_err, simGeom$R, 0.01, num_cats, c(0.5, 0.5), c(0.5, 0.5), 200)
+
+mean_ms <- rowMeans(b$Mtrace[,-(1:50)])
+low_ms <- apply(b$Mtrace[,-(1:50)], 1, min)
+hi_ms <- apply(b$Mtrace[,-(1:50)], 1, max)
+
+plot(categ_centers$mean_rd, mean_ms, type = "l")
+lines(categ_centers$mean_rd, low_ms, col = "red")
+lines(categ_centers$mean_rd, hi_ms, col = "blue")
+points(categ_centers$mean_rd, 1 / 1:num_cats, col = "orange")
+
+```
+
+OK, that is what it is supposed to look like.  The orange points are the true miscall rate.  That is
+pretty solid.
+
+What about if we start off at M = 0.5 instead of M = 1.0.  Will it not shoot up to 1.0?
+```{r}
+simGeom2 <- simulate_het_miscall_rd(Y, R, M = 0.5 / 1:num_cats)
+b <- estimate_m_rd(simGeom2$Y_with_err, simGeom$R, 0.01, num_cats, c(0.5, 0.5), c(0.5, 0.5), 200)
+
+mean_ms <- rowMeans(b$Mtrace[,-(1:50)])
+low_ms <- apply(b$Mtrace[,-(1:50)], 1, min)
+hi_ms <- apply(b$Mtrace[,-(1:50)], 1, max)
+
+plot(categ_centers$mean_rd, mean_ms, type = "l")
+lines(categ_centers$mean_rd, low_ms, col = "red")
+lines(categ_centers$mean_rd, hi_ms, col = "blue")
+points(categ_centers$mean_rd, 0.5 / 1:num_cats, col = "orange")
+
+```
+
+How about if it is bad across the boards?
+
+```{r}
+simBad <- simulate_het_miscall_rd(Y, R, M = 0.3)
+b <- estimate_m_rd(simBad$Y_with_err, simBad$R, 0.01, num_cats, c(0.5, 0.5), c(0.5, 0.5), 200)
+
+mean_ms <- rowMeans(b$Mtrace[,-(1:50)])
+low_ms <- apply(b$Mtrace[,-(1:50)], 1, min)
+hi_ms <- apply(b$Mtrace[,-(1:50)], 1, max)
+
+plot(categ_centers$mean_rd, mean_ms, type = "l", ylim = c(0, 1))
+lines(categ_centers$mean_rd, low_ms, col = "red")
+lines(categ_centers$mean_rd, hi_ms, col = "blue")
+points(categ_centers$mean_rd, rep(0.3, nrow(categ_centers)), col = "orange")
+
+
+```
+
+OK, there is a lot of uncertainty there, but that will be reduced to the extent that
+one can focus on larger sample sizes (more individuals) and also try to have 
+sufficient numbers of loci in the different read depth categories.
+

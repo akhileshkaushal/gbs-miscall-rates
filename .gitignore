@@ -11,3 +11,7 @@ processed_data/wifl*
 005-check-model-with-simulations.nb.html
 outputs
 radiator_data_*
+006-develop-read-depth-model.nb.html
+007-pearl-millet-read-depth-model.nb.html
+008-est-with-rd-several-data-sets.nb.html
+dev_stuff

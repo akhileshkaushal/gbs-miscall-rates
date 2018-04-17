@@ -1,0 +1,368 @@
+---
+title: "Apply the model with  Read Depth Model to some Data Sets"
+output: 
+  html_notebook:
+    toc: true
+    toc_float: true
+---
+
+
+Gonna work through a few different VCF files from data sets for which I have previously estimated a
+het miscall rate without including read depth in the model. (These data sets are a subset of the ones
+I presented at ConGen2017---the ones that also have read depth information).
+
+What I am doing here is lumping the genotype observations into read-depth categories (bins) that have _at least_
+5000 or 10000 (or 30,000) called genotypes in them (the actual minimum number can be seen in the code in the call
+to `prep_vcf_for_est_m_rd()`), and then estimating a het miscall rate that is assumed to apply to each genotype in 
+those bins.  Some of the bins have more than the minimum in them typically if many genotypes all had the same read depth.  This is denoted by the colors of the points.
+
+The plots show the posterior mean estimate of the het miscall rate for each bin as well as the 90% CIs.  The
+x-axis is the mean read-depth over all the genotypes included in the bin.
+I haven't run the MCMC sampler long in most cases, but it seems to mix well.
+
+On each plot I report the overall het miscall rate that I estimated when I ran these for ConGen under
+the model in which every genotype was subject to the same error rate, irrespective of read depth.
+
+What I find interesting (I think it is the money-shot, actually) is that, in every case there is a strong pattern of decreasing error rate with read depth.
+I find this convincing that genotyping error rates in RAD seq data due to low read depth are pervasive.
+However, in some cases the error rate drops down to zero (or very nearly so), whereas in other cases it does not.
+My hunch for the cases where it does not fall off to zero is that those are data sets with other HWE issues.  I suspect that
+under-merging of stacks could play a role in some, while in others there might be some population structure,
+or inbreeding, etc.  But, regardless of those other factors, heterozygote miscall errors at low read depths get
+piled on top of those.
+
+
+
+## Prelims
+
+
+This gets the libraries we need and sources and compiles the functions.
+```{r}
+library(tidyverse)
+library(vcfR)
+library(viridis)
+
+Rcpp::sourceCpp("src/estimate_m_rd.cpp")
+source("R/est_m_rd_support_funcs.R")
+
+```
+
+## Bonnethead Sharks
+
+```{r}
+# read in the data
+v <- read.vcfR("raw_data/bonnethead_shark_SNP.FINAL.recode.vcf.gz")
+
+# get the pop tibble
+pops <- read_csv("processed_data/bonnethead_shark_pops.csv")
+
+# get the individuals we want and the FORMAT column
+indivs <- pops$sample[pops$pop == "PC"]
+v@gt <- v@gt[, c("FORMAT", indivs)]
+
+
+# prep it
+p <- prep_vcf_for_est_m_rd(v, "DP", 20000)
+
+# estimate it
+b <- estimate_m_rd(Y = p$mat012, 
+                   R = p$dp_bins_list$dp_bins, 
+                   init_m = 0.1, 
+                   num_cats = p$dp_bins_list$num_cats, 
+                   p_prior = c(0.5, 0.5), 
+                   m_prior = c(0.5, 0.5), 
+                   num_reps = 500)
+
+# tidy the output
+res <- tidy_m_ests(b, p$dp_bins_list$bin_stats)
+```
+
+```{r}
+# plot it
+ggplot(res) +
+  geom_line(aes(x = mean_dp, y = mean)) +
+  geom_ribbon(aes(x = mean_dp, ymin = lo95, ymax = hi95), fill = "pink", alpha = 0.6) +
+  geom_point(aes(x = mean_dp, y = mean, colour = total_n)) +
+  ggtitle("Bonnethead Shark (PC).  Overall het-miscall rate = 0.01") +
+  scale_colour_viridis()
+
+```
+
+
+It is worth re-estimating the overall rate with the data derived from the VCF this way rather
+than by vcftools, to make sure it we will have it working correctly.
+```{r}
+# what if we just estimate the overall error rate?
+source("R/estimate-m-etc.R")
+
+mest <- estimate_m(dat012 = p$mat012, nreps = 2000, m_init = 0.1, a0 = 0.5, a1 = 0.5, sm = 0.01)
+mean(mest$m[-(1:50)])
+```
+Yep, that squares with previous results.
+
+
+
+## WIFL
+
+Let's fire this off on the wifls.  This doesn't work yet because it takes so friggin long...
+
+```{r, eval=FALSE}
+# read in the data
+v <- read.vcfR("~/Documents/UnsyncedData/WIFL_10-15-16/cleaned-175-105K.recode.vcf.gz")
+
+# get the pop tibble
+pops <- read_csv("processed_data/wifl_pops.csv")
+
+# get the individuals we want and the FORMAT column
+indivs <- pops$sample[pops$pop == "extAZ"]
+v@gt <- v@gt[, c("FORMAT", indivs)]
+
+
+# prep it
+p <- prep_vcf_for_est_m_rd(v, "DP", 50000)
+
+# estimate it
+b <- estimate_m_rd(Y = p$mat012, 
+                   R = p$dp_bins_list$dp_bins, 
+                   init_m = 0.1, 
+                   num_cats = p$dp_bins_list$num_cats, 
+                   p_prior = c(0.5, 0.5), 
+                   m_prior = c(0.5, 0.5), 
+                   num_reps = 200)
+
+# tidy the output
+res <- tidy_m_ests(b, p$dp_bins_list$bin_stats)
+```
+It seems that something has gone awry here, such that the first bin is diving to zero
+which certainly isn't right.  I'll leave tht in there though, and will fix it later.
+That is just some weird glitch.  Everything else fits the pattern.
+
+```{r}
+# plot it
+ggplot(res) +
+  geom_line(aes(x = mean_dp, y = mean)) +
+  geom_ribbon(aes(x = mean_dp, ymin = lo95, ymax = hi95), fill = "pink", alpha = 0.6) +
+  geom_point(aes(x = mean_dp, y = mean, colour = total_n)) +
+  ggtitle("WIFL (extAZ).  Overall het-miscall rate = 0.03") +
+  scale_colour_viridis()
+
+```
+
+## Red Drum
+
+```{r}
+# read in the data
+v <- read.vcfR("raw_data/red_drum_Final_Filtered_SNPs.vcf.gz")
+
+# get the pop tibble
+pops <- read_csv("processed_data/red_drum_pops.csv")
+
+# get the individuals we want and the FORMAT column
+indivs <- pops$sample[pops$pop == "all_lumped"]
+v@gt <- v@gt[, c("FORMAT", indivs)]
+
+
+# prep it
+p <- prep_vcf_for_est_m_rd(v, "DP", 45000)
+
+# estimate it
+b <- estimate_m_rd(Y = p$mat012, 
+                   R = p$dp_bins_list$dp_bins, 
+                   init_m = 0.1, 
+                   num_cats = p$dp_bins_list$num_cats, 
+                   p_prior = c(0.5, 0.5), 
+                   m_prior = c(0.5, 0.5), 
+                   num_reps = 500)
+
+# tidy the output
+res <- tidy_m_ests(b, p$dp_bins_list$bin_stats)
+```
+
+```{r}
+# plot it
+ggplot(res) +
+  geom_line(aes(x = mean_dp, y = mean)) +
+  geom_ribbon(aes(x = mean_dp, ymin = lo95, ymax = hi95), fill = "pink", alpha = 0.6) +
+  geom_point(aes(x = mean_dp, y = mean, colour = total_n)) +
+  ggtitle("Red Drum (all_lumped).  Overall het-miscall rate = 0.05") +
+  scale_colour_viridis()
+
+```
+
+
+### Test on same data with no pattern
+
+It is natural to worry that the pattern we are seeing here of het miscall rate decreasing
+with higher read depth is an artifact due to the way the estimation is done.  That doesn't
+seem likely, but it is worth investigating.  One way to do that is to apply the method
+to a situation where there should be no relationship between read depth and 
+het-miscall rate.  We can manufacture such a scenario by permuting the read depth categories
+(holding missing data positions constant) so that their relationship to genotype
+is randomized.  Let's try it:
+
+```{r}
+# estimate it
+permed <- p$dp_bins_list$dp_bins
+permed[permed != -1] <- sample(as.vector(permed[permed != -1]))
+
+b <- estimate_m_rd(Y = p$mat012, 
+                   R = permed, 
+                   init_m = 0.1, 
+                   num_cats = p$dp_bins_list$num_cats, 
+                   p_prior = c(0.5, 0.5), 
+                   m_prior = c(0.5, 0.5), 
+                   num_reps = 500)
+
+# tidy the output
+res <- tidy_m_ests(b, p$dp_bins_list$bin_stats)
+
+# plot it
+ggplot(res) +
+  geom_line(aes(x = mean_dp, y = mean)) +
+  geom_ribbon(aes(x = mean_dp, ymin = lo95, ymax = hi95), fill = "pink", alpha = 0.6) +
+  geom_point(aes(x = mean_dp, y = mean, colour = total_n)) +
+  ggtitle("Red Drum (all_lumped).  Overall het-miscall rate = 0.05") +
+  scale_colour_viridis()
+```
+
+OK, that is a good check.  We gert pretty much what we expect---no clear pattern there.
+
+
+
+
+## Lobster
+
+
+
+```{r}
+# read in the data
+v <- read.vcfR("raw_data/10156-586.recode.vcf.gz")
+
+# get the individuals we want and the FORMAT column
+indivs <- which(str_detect(colnames(v@gt), "^BUZ"))
+
+v@gt <- v@gt[, c(1, indivs)]
+
+
+# prep it
+p <- prep_vcf_for_est_m_rd(v, "DP", 5000)
+
+# estimate it
+b <- estimate_m_rd(Y = p$mat012, 
+                   R = p$dp_bins_list$dp_bins, 
+                   init_m = 0.1, 
+                   num_cats = p$dp_bins_list$num_cats, 
+                   p_prior = c(0.5, 0.5), 
+                   m_prior = c(0.5, 0.5), 
+                   num_reps = 200)
+
+# tidy the output
+res <- tidy_m_ests(b, p$dp_bins_list$bin_stats)
+```
+
+```{r}
+# plot it
+ggplot(res) +
+  geom_line(aes(x = mean_dp, y = mean)) +
+  geom_ribbon(aes(x = mean_dp, ymin = lo95, ymax = hi95), fill = "pink", alpha = 0.6) +
+  geom_point(aes(x = mean_dp, y = mean, colour = total_n)) +
+  ggtitle("Lobster (BUZ).  Overall het-miscall rate = 0.25") +
+  scale_colour_viridis()
+
+```
+
+
+
+## Anchovy
+
+```{r}
+# read in the data
+v <- read.vcfR("raw_data/4pop_no_hybrid_mac_1.vcf.gz")
+
+# get the pop tibble
+pops <- read_csv("processed_data/anchovy_pops.csv")
+
+# get the individuals we want and the FORMAT column
+indivs <- pops$sample[pops$pop == "MED_LAG"]
+v@gt <- v@gt[, c("FORMAT", indivs)]
+
+# make the IDs unique (just make them CHROM--POS. Otherwise extract.gt won't work...)
+#v@fix[, "ID"] <- paste(v@fix[, "CHROM"], v@fix[, "POS"], sep = "--")
+
+# prep it
+p <- prep_vcf_for_est_m_rd(v, "DP", 15000)
+
+# estimate it
+b <- estimate_m_rd(Y = p$mat012, 
+                   R = p$dp_bins_list$dp_bins, 
+                   init_m = 0.1, 
+                   num_cats = p$dp_bins_list$num_cats, 
+                   p_prior = c(0.5, 0.5), 
+                   m_prior = c(0.5, 0.5), 
+                   num_reps = 500)
+
+# tidy the output
+res <- tidy_m_ests(b, p$dp_bins_list$bin_stats)
+```
+
+```{r}
+# plot it
+ggplot(res) +
+  geom_line(aes(x = mean_dp, y = mean)) +
+  geom_ribbon(aes(x = mean_dp, ymin = lo95, ymax = hi95), fill = "pink", alpha = 0.6) +
+  geom_point(aes(x = mean_dp, y = mean, colour = total_n)) +
+  ggtitle("Anchovy (MED_LAG).  Overall het-miscall rate = 0.28") +
+  scale_colour_viridis() +
+  ylim(c(0, NA))
+
+```
+
+
+
+## Snails
+
+```{r}
+# read in the data
+v <- read.vcfR("raw_data/all.vcf.gz")
+
+# get the pop tibble
+pops <- read_csv("processed_data/snails_pops.csv")
+
+# get the individuals we want and the FORMAT column
+indivs <- pops$sample[pops$pop == "EJ"]
+v@gt <- v@gt[, c("FORMAT", indivs)]
+
+# make the IDs unique (just make them CHROM--POS. Otherwise extract.gt won't work...)
+v@fix[, "ID"] <- paste(v@fix[, "CHROM"], v@fix[, "POS"], sep = "--")
+
+# prep it
+p <- prep_vcf_for_est_m_rd(v, "DP", 10000)
+
+# estimate it
+b <- estimate_m_rd(Y = p$mat012, 
+                   R = p$dp_bins_list$dp_bins, 
+                   init_m = 0.1, 
+                   num_cats = p$dp_bins_list$num_cats, 
+                   p_prior = c(0.5, 0.5), 
+                   m_prior = c(0.5, 0.5), 
+                   num_reps = 500)
+
+# tidy the output
+res <- tidy_m_ests(b, p$dp_bins_list$bin_stats)
+```
+
+
+```{r}
+# plot it
+ggplot(res) +
+  geom_line(aes(x = mean_dp, y = mean)) +
+  geom_ribbon(aes(x = mean_dp, ymin = lo95, ymax = hi95), fill = "pink", alpha = 0.6) +
+  geom_point(aes(x = mean_dp, y = mean, colour = total_n)) +
+  ggtitle("Snails (EJ).  Overall het-miscall rate = 0.45") +
+  scale_colour_viridis() +
+  ylim(c(0, NA))
+
+```
+
+
+

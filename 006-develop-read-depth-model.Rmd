@@ -1,0 +1,200 @@
+---
+title: "Develop the Read Depth Model"
+output: 
+  html_notebook:
+    toc: true
+    toc_float: true
+---
+
+
+I am working up a model that will use read depth information as well, and I need
+a good data set for developing it.
+
+We need to have read depth data so it will have to be a VCF file.  Of the data
+sets I have locally in this project, it looks like lobster and snails might be the 
+best to try.
+
+## Reading in and looking at the Lobster Data
+
+Let's go for lobster, and we are going to want to extract the population BUZ from that.
+```{r}
+library(tidyverse)
+library(vcfR)
+library(broom)
+
+
+v <- read.vcfR("raw_data/10156-586.recode.vcf.gz")
+# to make things a little faster, we will pull out the BUZ here
+v@gt <- v@gt[, str_detect(colnames(v@gt), "^BUZ|^FORMAT")]
+
+vt <- vcfR2tidy(v)
+
+# now we can make matrices of the 012 genotypes and read depths
+gt <- vt$gt %>%
+  mutate(gt012 = recode(gt_GT, `0/0` = 0, `0/1` = 1, `1/0` = 1, `1/1` = 2)) %>%
+  mutate(gt_hz = ifelse(gt012 == 0 | gt012 == 2, "homoz", "het")) %>%
+  mutate(gt012 = as.integer(ifelse(is.na(gt012), -1, gt012)))
+
+
+```
+
+Now, we can look at a few things, like the distribution of read depths
+```{r}
+ggplot(gt, aes(x =  gt_DP, fill = gt_hz)) +
+  geom_density() +
+  facet_wrap(~ gt_hz, scales = "free_y")
+```
+
+OK, that is largely what things should look like.  Now, can we see any overall different
+in the cumulative distibution of these things
+```{r}
+ggplot(gt, aes(x =  gt_DP, colour = gt_hz)) +
+  stat_ecdf(geom = "step") +
+  coord_cartesian(xlim = c(0,375))
+```
+
+OK, that is sort of what you expect to see. Let's zoom in on it:
+```{r}
+ggplot(gt, aes(x =  gt_DP, colour = gt_hz)) +
+  stat_ecdf(geom = "step") +
+  coord_cartesian(xlim = c(0,50))
+```
+
+OK, the gap between the two lines seems to keep growing up to about total read depth of 
+35 or so (just by eyeball), which suggests that hets might still be undercalled up to 
+a read depth higher than 10 or 15.  That is what we are going to be trying to get at.
+
+## Read depth categories
+
+Here are the number of snp x individual combos at each of the different read depth levels for
+non-missing genotype calls
+```{r}
+rcnts <- table(gt$gt_DP[gt$gt012 != -1])
+rcnts
+```
+
+That is nice.  I would like to break this up so that there are at least 500 in each bin.  We can go sequentially by read
+depth up to about 147, and then we will have to start merging things.  We can just make a silly function that goes through
+the above table and lumps things till we have at least 500 in each cell.
+```{r}
+lump_to_list <- function(x) {
+  j <- 0
+  ret <- list()
+  d <- as.integer(names(x))
+  cumul <- 0
+  thing <- NULL
+  for(i in seq_along(x)) {
+    cumul <- cumul + x[i]
+    thing <- c(thing, d[i])
+    if(cumul >= 500) {
+      j <- j + 1
+      ret[[j]] <- thing
+      cumul <- 0
+      thing <- NULL
+    }
+  }
+  
+  # spit out the remaning ones if they aren't already there
+  if(cumul > 0) {
+    j <- j + 1
+    ret[[j]] <- thing
+  }
+  ret
+}
+
+# then do it
+lumpy_list <- lump_to_list(rcnts)
+```
+
+Once we have that list we can turn it into a tibble for left_joining categories on there
+```{r}
+lumpy_tib <- lapply(1:length(lumpy_list), function(i) tibble(gt_DP = lumpy_list[[i]], dp_cat = i) ) %>%
+  bind_rows()
+
+gt_plus <- gt %>%
+  left_join(lumpy_tib, by = "gt_DP")
+```
+## Getting the Read Depth and 012 matrices
+
+This should be an easy operation.
+```{r}
+g012 <- gt %>% 
+  select(Indiv, POS, gt012) %>%
+  spread(key = POS, value = gt012) %>%
+  as.data.frame()
+rownames(g012) <- g012$Indiv
+g012_mat <- as.matrix(g012[,-1])
+```
+
+and then the same thing wtih DP categories
+```{r}
+dp <- gt_plus %>% 
+  select(Indiv, POS, dp_cat) %>%
+  spread(key = POS, value = dp_cat) %>%
+  as.data.frame()
+rownames(dp) <- dp$Indiv
+dp_mat <- as.matrix(dp[,-1])
+```
+
+Now save those to dev_stuff
+```{r}
+write_rds(g012_mat, path = "dev_stuff/g012_mat.rds")
+write_rds(dp_mat, path = "dev_stuff/dp_mat.rds")
+```
+
+
+Now, if I want to read those back in for working on the function
+```{r}
+Y <- read_rds("dev_stuff/g012_mat.rds")
+R <- read_rds("dev_stuff/dp_mat.rds")
+R[is.na(R)] <- -1
+
+num_cats <- length(unique(R[R>0]))
+
+b <- estimate_m_rd(Y, R, 0.1, num_cats, c(0.5, 0.5), c(0.5, 0.5), 200)
+
+
+# now, check the alle freqs amongst the x's
+x <- b$X
+
+
+xfreqs <- 1 - colMeans(x/2, na.rm = TRUE)
+
+plot(b$p, xfreqs)
+
+tmp <- tibble(x = as.vector(b$X), y = as.vector(b$Y), r = as.vector(R))
+tmp %>% filter(y == 0 | y == 2, y != x)
+
+p1 <- b$p
+b <- estimate_m_rd(Y, R, 0.1, num_cats, c(0.5, 0.5))
+p2 <- b$p
+plot(p1, p2)
+```
+
+Here we run it for 200 steps and then look at the progression of the Mtrace:
+```{r}
+b <- estimate_m_rd(Y, R, 0.1, num_cats, c(0.5, 0.5), c(0.5, 0.5), 200)
+
+cat_centers <- lumpy_tib %>%
+  group_by(dp_cat) %>%
+  summarise(mean_rd = mean(gt_DP))
+
+dim(b$Mtrace)
+
+trace <- tibble(rep = rep(1:ncol(b$Mtrace), each = nrow(b$Mtrac)), 
+       dp_cat = rep(1:nrow(b$Mtrace), ncol(b$Mtrac)), 
+       M = as.vector(b$Mtrace)
+       )
+
+trace_plus <- trace %>%
+  left_join(cat_centers)
+
+trace_plus %>%
+  filter(rep > 50) %>%
+  group_by(mean_rd) %>%
+  summarise(post_mean = mean(M)) %>%
+ggplot(., aes(x = mean_rd, y = post_mean)) +
+  geom_line(size = 0.3)
+
+ggsave(filename = "outputs/lobster_buz_het_miscall_vs_read_depth_categories.pdf", width = 7, height = 5)
+```
