@@ -1,5 +1,5 @@
 ---
-title: "Apply the model with  Read Depth Model to some Data Sets"
+title: "Apply the Model with Read Depth to some Data Sets"
 output: 
   html_notebook:
     toc: true
